@@ -42,5 +42,5 @@ db_dev.trace.db
 apiV1.json
 apiV1
 src/main/generated
-src/main/resources/application-secret.yml
+src/main/resources/*
 *.tmp

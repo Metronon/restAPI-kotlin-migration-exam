@@ -1,5 +1,11 @@
 package com.ll.domain.post.post.entity;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
 import com.ll.domain.member.member.entity.Member;
 import com.ll.domain.post.comment.entity.PostComment;
 import com.ll.domain.post.genFile.entity.PostGenFile;
@@ -8,23 +14,20 @@ import com.ll.global.jpa.entity.BaseTime;
 import com.ll.global.rsData.RsData;
 import com.ll.standard.base.Empty;
 import com.ll.standard.util.Ut;
-import jakarta.persistence.*;
-import lombok.Builder;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.experimental.SuperBuilder;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Entity
 @Getter
 @Setter
-@SuperBuilder
 @NoArgsConstructor
 public class Post extends BaseTime {
     @ManyToOne(fetch = FetchType.LAZY)
@@ -37,11 +40,9 @@ public class Post extends BaseTime {
     private String content;
 
     @OneToMany(mappedBy = "post", cascade = {CascadeType.PERSIST, CascadeType.REMOVE}, orphanRemoval = true)
-    @Builder.Default
     private List<PostComment> comments = new ArrayList<>();
 
     @OneToMany(mappedBy = "post", cascade = {CascadeType.PERSIST, CascadeType.REMOVE}, orphanRemoval = true)
-    @Builder.Default
     private List<PostGenFile> genFiles = new ArrayList<>();
 
     // OneToOne 은 레이지 로딩이 안된다.
@@ -52,12 +53,20 @@ public class Post extends BaseTime {
 
     private boolean listed;
 
+    public Post(Member author, String title, String content, boolean published, boolean listed) {
+        this.author = author;
+        this.title = title;
+        this.content = content;
+        this.published = published;
+        this.listed = listed;
+    }
+
     public PostComment addComment(Member author, String content) {
-        PostComment comment = PostComment.builder()
-                .post(this)
-                .author(author)
-                .content(content)
-                .build();
+        PostComment comment = new PostComment(
+            this,
+            author,
+            content
+        );
 
         comments.add(comment);
 
@@ -70,8 +79,8 @@ public class Post extends BaseTime {
 
     public Optional<PostComment> getCommentById(long commentId) {
         return comments.stream()
-                .filter(comment -> comment.getId().equals(commentId))
-                .findFirst();
+            .filter(comment -> comment.getId().equals(commentId))
+            .findFirst();
     }
 
     public void removeComment(PostComment postComment) {
@@ -91,12 +100,12 @@ public class Post extends BaseTime {
 
     public void checkActorCanDelete(Member actor) {
         Optional.of(
-                        getCheckActorCanDeleteRs(actor)
-                )
-                .filter(RsData::isFail)
-                .ifPresent(rsData -> {
-                    throw new ServiceException(rsData.getResultCode(), rsData.getMsg());
-                });
+                getCheckActorCanDeleteRs(actor)
+            )
+            .filter(RsData::isFail)
+            .ifPresent(rsData -> {
+                throw new ServiceException(rsData.getResultCode(), rsData.getMsg());
+            });
     }
 
 
@@ -110,12 +119,12 @@ public class Post extends BaseTime {
 
     public void checkActorCanModify(Member actor) {
         Optional.of(
-                        getCheckActorCanModifyRs(actor)
-                )
-                .filter(RsData::isFail)
-                .ifPresent(rsData -> {
-                    throw new ServiceException(rsData.getResultCode(), rsData.getMsg());
-                });
+                getCheckActorCanModifyRs(actor)
+            )
+            .filter(RsData::isFail)
+            .ifPresent(rsData -> {
+                throw new ServiceException(rsData.getResultCode(), rsData.getMsg());
+            });
     }
 
 
@@ -131,12 +140,12 @@ public class Post extends BaseTime {
 
     public void checkActorCanRead(Member actor) {
         Optional.of(
-                        getCheckActorCanReadRs(actor)
-                )
-                .filter(RsData::isFail)
-                .ifPresent(rsData -> {
-                    throw new ServiceException(rsData.getResultCode(), rsData.getMsg());
-                });
+                getCheckActorCanReadRs(actor)
+            )
+            .filter(RsData::isFail)
+            .ifPresent(rsData -> {
+                throw new ServiceException(rsData.getResultCode(), rsData.getMsg());
+            });
     }
 
     private PostGenFile processGenFile(PostGenFile oldPostGenFile, PostGenFile.TypeCode typeCode, int fileNo, String filePath) {
@@ -148,25 +157,24 @@ public class Post extends BaseTime {
         String fileExtType2Code = Ut.file.getFileExtType2CodeFromFileExt(fileExt);
 
         String metadataStr = Ut.file.getMetadata(filePath).entrySet().stream()
-                .map(entry -> entry.getKey() + "=" + entry.getValue())
-                .collect(Collectors.joining("&"));
+            .map(entry -> entry.getKey() + "=" + entry.getValue())
+            .collect(Collectors.joining("&"));
 
         if (Ut.str.isNotBlank(metadataStrFromFileName)) {
             metadataStr = Ut.str.isNotBlank(metadataStr)
-                    ? metadataStr + "&" + metadataStrFromFileName
-                    : metadataStrFromFileName;
+                ? metadataStr + "&" + metadataStrFromFileName
+                : metadataStrFromFileName;
         }
 
         String fileName = isModify ? Ut.file.withNewExt(oldPostGenFile.getFileName(), fileExt) : UUID.randomUUID() + "." + fileExt;
         int fileSize = Ut.file.getFileSize(filePath);
         fileNo = fileNo == 0 ? getNextGenFileNo(typeCode) : fileNo;
 
-        PostGenFile genFile = isModify ? oldPostGenFile : PostGenFile
-                .builder()
-                .post(this)
-                .typeCode(typeCode)
-                .fileNo(fileNo)
-                .build();
+        PostGenFile genFile = isModify ? oldPostGenFile : new PostGenFile(
+            this,
+            typeCode,
+            fileNo
+        );
 
         genFile.setOriginalFileName(originalFileName);
         genFile.setMetadata(metadataStr);
@@ -198,28 +206,28 @@ public class Post extends BaseTime {
 
     private int getNextGenFileNo(PostGenFile.TypeCode typeCode) {
         return genFiles.stream()
-                .filter(genFile -> genFile.getTypeCode().equals(typeCode))
-                .mapToInt(PostGenFile::getFileNo)
-                .max()
-                .orElse(0) + 1;
+            .filter(genFile -> genFile.getTypeCode().equals(typeCode))
+            .mapToInt(PostGenFile::getFileNo)
+            .max()
+            .orElse(0) + 1;
     }
 
     public Optional<PostGenFile> getGenFileById(long id) {
         return genFiles.stream()
-                .filter(genFile -> genFile.getId().equals(id))
-                .findFirst();
+            .filter(genFile -> genFile.getId().equals(id))
+            .findFirst();
     }
 
     public Optional<PostGenFile> getGenFileByTypeCodeAndFileNo(PostGenFile.TypeCode typeCode, int fileNo) {
         return genFiles.stream()
-                .filter(genFile -> genFile.getTypeCode().equals(typeCode))
-                .filter(genFile -> genFile.getFileNo() == fileNo)
-                .findFirst();
+            .filter(genFile -> genFile.getTypeCode().equals(typeCode))
+            .filter(genFile -> genFile.getFileNo() == fileNo)
+            .findFirst();
     }
 
     public void deleteGenFile(PostGenFile.TypeCode typeCode, int fileNo) {
         getGenFileByTypeCodeAndFileNo(typeCode, fileNo)
-                .ifPresent(this::deleteGenFile);
+            .ifPresent(this::deleteGenFile);
     }
 
     public void deleteGenFile(PostGenFile postGenFile) {
@@ -233,8 +241,8 @@ public class Post extends BaseTime {
 
     public PostGenFile modifyGenFile(PostGenFile.TypeCode typeCode, int fileNo, String filePath) {
         PostGenFile postGenFile = getGenFileByTypeCodeAndFileNo(
-                typeCode,
-                fileNo
+            typeCode,
+            fileNo
         ).get();
 
         return modifyGenFile(postGenFile, filePath);
@@ -242,8 +250,8 @@ public class Post extends BaseTime {
 
     public PostGenFile putGenFile(PostGenFile.TypeCode typeCode, int fileNo, String filePath) {
         Optional<PostGenFile> opPostGenFile = getGenFileByTypeCodeAndFileNo(
-                typeCode,
-                fileNo
+            typeCode,
+            fileNo
         );
 
         if (opPostGenFile.isPresent()) {
@@ -255,12 +263,12 @@ public class Post extends BaseTime {
 
     public void checkActorCanMakeNewGenFile(Member actor) {
         Optional.of(
-                        getCheckActorCanMakeNewGenFileRs(actor)
-                )
-                .filter(RsData::isFail)
-                .ifPresent(rsData -> {
-                    throw new ServiceException(rsData.getResultCode(), rsData.getMsg());
-                });
+                getCheckActorCanMakeNewGenFileRs(actor)
+            )
+            .filter(RsData::isFail)
+            .ifPresent(rsData -> {
+                throw new ServiceException(rsData.getResultCode(), rsData.getMsg());
+            });
     }
 
     public RsData<Empty> getCheckActorCanMakeNewGenFileRs(Member actor) {
@@ -277,7 +285,7 @@ public class Post extends BaseTime {
 
     public String getThumbnailImgUrlOrDefault() {
         return Optional.ofNullable(thumbnailGenFile)
-                .map(PostGenFile::getPublicUrl)
-                .orElse("https://placehold.co/1200x1200?text=POST " + getId() + "&darkInvertible=1");
+            .map(PostGenFile::getPublicUrl)
+            .orElse("https://placehold.co/1200x1200?text=POST " + getId() + "&darkInvertible=1");
     }
 }

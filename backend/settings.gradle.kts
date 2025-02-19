@@ -1,13 +1,1 @@
-pluginManagement {
-    plugins {
-        kotlin("jvm") version "1.9.25" // Use a valid version
-    }
-
-    repositories {
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
-
-rootProject.name = "kotlin-migration"
-
+rootProject.name = "kopring-2025-02-17"

@@ -3,7 +3,6 @@ package com.ll.domain.post.genFile.controller;
 import com.ll.domain.member.member.service.MemberService;
 import com.ll.domain.post.genFile.entity.PostGenFile;
 import com.ll.domain.post.post.service.PostService;
-import com.ll.global.app.AppConfig;
 import com.ll.standard.sampleResource.SampleResource;
 import com.ll.standard.util.Ut;
 import org.hamcrest.Matchers;
